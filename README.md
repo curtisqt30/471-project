@@ -1,6 +1,6 @@
 # 471-project
 
-## Create virtual environment
+## 1) (optional) Create virtual environment
 - macOS/Linx
 `python3 -m venv .venv`
 `source .venv/bin/activate`
@@ -12,13 +12,13 @@
 - Install requirements
 `pip install -r requirements.txt`
 
-## Run the server
+## 2) Start the server (in one terminal)
 `cd src`
-`python -m server.main`
+`python -m server.main --host 0.0.0.0 --port 5050`
 
-## Run the client
+## 3) Start the client (in another terminal)
 `cd src`
-`python -m client.main <host> <port>`
+`python -m client.main 127.0.0.1 5050`
 
 
 ## Project Overview
