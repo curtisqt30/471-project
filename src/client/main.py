@@ -74,15 +74,119 @@ class FTPClient:
 
     # LS command - view server data directory
     def command_ls(self) -> bool:
-        pass
+        if not self.send_command("LS"):
+            return False
+        
+        response = self.receive_response()
+        if response:
+            if response.get('status') == 'OK':
+                files = response.get('data', {}).get('files', [])
+                print(f"\n[server] {response.get('message', '')}")
+                if files:
+                    print("Files on server:")
+                    for file in files:
+                        print(f"  - {file}")
+                else:
+                    print("  (no files)")
+                return True
+            else:
+                print(f"[server] Error: {response.get('message', 'Unknown error')}")
+        return False
 
     # GET Command - download files
     def command_get(self, filename: str) -> bool:
-        pass
+        if not filename:
+            print("[error] GET requires a filename")
+            return False
+        
+        if not self.send_command(f"GET {filename}"):
+            return False
+        
+        # Receive metadata response
+        response = self.receive_response()
+        if response:
+            if response.get('status') == 'OK':
+                file_info = response.get('data', {})
+                print(f"[server] {response.get('message', '')}")
+                print(f"  File: {file_info.get('filename', filename)}")
+                print(f"  Size: {file_info.get('size', 0)} bytes")
+                
+                # Receive file data
+                data_response = self.receive_response()
+                if data_response and data_response.get('status') == 'FILE_DATA':
+                    content = data_response.get('data', {}).get('content', '')
+                    
+                    # Save to local file
+                    local_path = Path(filename)
+                    try:
+                        local_path.write_text(content)
+                        print(f"[client] File saved: {local_path.absolute()}")
+                        return True
+                    except Exception as e:
+                        print(f"[error] Failed to save file: {e}")
+                elif data_response:
+                    print(f"[server] {data_response.get('message', 'Failed to receive file')}")
+            else:
+                print(f"[server] Error: {response.get('message', 'Unknown error')}")
+        return False
 
     # PUT Command - upload files
     def command_put(self, filename: str) -> bool:
-        pass
+        if not filename:
+            print("[error] PUT requires a filename")
+            return False
+        
+        # Check if local file exists
+        local_path = Path(filename)
+        if not local_path.exists():
+            print(f"[error] Local file not found: {filename}")
+            return False
+        
+        if not local_path.is_file():
+            print(f"[error] Not a file: {filename}")
+            return False
+        
+        # Send PUT command
+        if not self.send_command(f"PUT {local_path.name}"):
+            return False
+        
+        # Wait for ready response
+        response = self.receive_response()
+        if response and response.get('status') == 'READY':
+            print(f"[server] {response.get('message', '')}")
+            
+            try:
+                # Read file content
+                file_size = local_path.stat().st_size
+                
+                if file_size < 8192:  # Small file (< 8KB)
+                    try:
+                        # Try to send as text
+                        content = local_path.read_text()
+                        file_data = json.dumps({"content": content})
+                        self.socket.sendall(file_data.encode('utf-8'))
+                    except UnicodeDecodeError:
+                        # Send as binary
+                        content = local_path.read_bytes()
+                        self.socket.sendall(content)
+                    
+                    # Receive confirmation
+                    response = self.receive_response()
+                    if response:
+                        if response.get('status') == 'OK':
+                            print(f"[server] {response.get('message', 'File uploaded')}")
+                            return True
+                        else:
+                            print(f"[server] Error: {response.get('message', 'Upload failed')}")
+                else:
+                    print(f"[error] File too large for current implementation (max 8KB)")
+                    print(f"[error] File size: {file_size} bytes")
+            except Exception as e:
+                print(f"[error] Failed to read/send file: {e}")
+        elif response:
+            print(f"[server] Error: {response.get('message', 'Server not ready')}")
+        
+        return False
 
     # EXIT command - disconnect
     def command_exit(self) -> bool:
