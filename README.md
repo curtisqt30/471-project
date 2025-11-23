@@ -60,3 +60,30 @@ python -m server.main --host 0.0.0.0 --port 5050
 cd src
 python -m client.main 127.0.0.1 5050`
 ```
+
+## User Guide: File Storage
+
+### Directory Structure
+```
+src/
+├── client_data/    ← Your local files (uploads and downloads)
+└── server_data/    ← Server files
+```
+
+Both directories are created automatically when you first run the server and client.
+
+### Uploading Files (PUT)
+1. Place files you want to upload in the `client_data/` directory
+2. Use the `PUT` command with just the filename:
+   ```bash
+   ftp> PUT myfile.txt
+   ```
+3. The client reads from `client_data/myfile.txt` and uploads to `server_data/myfile.txt`
+
+### Downloading Files (GET)
+1. Use `LS` to see available files on the server
+2. Use the `GET` command with the filename:
+   ```bash
+   ftp> GET serverfile.txt
+   ```
+3. The file downloads to `client_data/serverfile.txt`
