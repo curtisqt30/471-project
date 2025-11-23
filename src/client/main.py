@@ -12,10 +12,21 @@ class FTPClient:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.socket: Optional[Socket.socket] = None
+        self.socket: Optional[socket.socket] = None
         self.connected = False
+        
+        # Setup client data directory
+        self.client_data_dir = Path("client_data")
+        self.client_data_dir.mkdir(exist_ok=True)
+        print(f"[client] Data directory: {self.client_data_dir.absolute()}")
+        
+        # Create a sample upload file for testing
+        sample_file = self.client_data_dir / "SampleUpload.txt"
+        if not sample_file.exists():
+            sample_file.write_text("This is a sample file from the FTP client to test the PUT command\n")
+            print(f"[client] Created sample file: SampleUpload.txt")
 
-    # Connect to the FTP SErver
+    # Connect to the FTP Server
     def connect(self) -> bool:
         try:
             self.socket = socket.create_connection((self.host, self.port), timeout=10)
@@ -42,7 +53,18 @@ class FTPClient:
 
     # Send a command to the server
     def send_command(self, command: str) -> bool:
-        pass
+        if not self.socket or not self.connected:
+            print("[error] Not connected to server")
+            return False
+        
+        try:
+            # Send command as UTF-8 encoded bytes
+            self.socket.sendall(command.encode('utf-8'))
+            return True
+        except Exception as e:
+            print(f"[error] Failed to send command: {e}")
+            self.connected = False
+            return False
 
     # Receive and parse JSON server response
     def receive_response(self) -> Optional[Dict[str, Any]]:
@@ -58,7 +80,7 @@ class FTPClient:
             
             # Parse JSON response
             response_text = data.decode('utf-8').strip()
-            # Handle multiple JSON objects (split by newlines)
+            # Handle multiple JSON objects in one response
             for line in response_text.split('\n'):
                 if line:
                     return json.loads(line)
@@ -116,11 +138,11 @@ class FTPClient:
                 if data_response and data_response.get('status') == 'FILE_DATA':
                     content = data_response.get('data', {}).get('content', '')
                     
-                    # Save to local file
-                    local_path = Path(filename)
+                    # Save to client_data directory
+                    local_path = self.client_data_dir / filename
                     try:
                         local_path.write_text(content)
-                        print(f"[client] File saved: {local_path.absolute()}")
+                        print(f"[client] File saved to: client_data/{filename}")
                         return True
                     except Exception as e:
                         print(f"[error] Failed to save file: {e}")
@@ -136,18 +158,22 @@ class FTPClient:
             print("[error] PUT requires a filename")
             return False
         
-        # Check if local file exists
-        local_path = Path(filename)
+        # Look in client_data directory
+        local_path = self.client_data_dir / filename
+        
         if not local_path.exists():
-            print(f"[error] Local file not found: {filename}")
+            print(f"[error] File not found in client_data/: {filename}")
+            print(f"[info] Please place file in: {self.client_data_dir.absolute()}")
             return False
         
         if not local_path.is_file():
             print(f"[error] Not a file: {filename}")
             return False
         
+        print(f"[client] Reading from: client_data/{filename}")
+        
         # Send PUT command
-        if not self.send_command(f"PUT {local_path.name}"):
+        if not self.send_command(f"PUT {filename}"):
             return False
         
         # Wait for ready response
@@ -204,10 +230,12 @@ class FTPClient:
     def run_interactive(self):
         print("\nFTP Client Commands:")
         print("  LS              - List files on server")
-        print("  GET <filename>  - Download file from server")
-        print("  PUT <filename>  - Upload file to server")
+        print("  GET <filename>  - Download file from server to client_data/")
+        print("  PUT <filename>  - Upload file from client_data/ to server")
         print("  EXIT            - Disconnect and quit")
         print("  HELP            - Show this help")
+        print()
+        print(f"Local files: {self.client_data_dir.absolute()}")
         print()
         
         while self.connected:
@@ -236,9 +264,10 @@ class FTPClient:
                 elif command == "HELP":
                     print("\nCommands:")
                     print("  LS              - List files on server")
-                    print("  GET <filename>  - Download file from server")
-                    print("  PUT <filename>  - Upload file to server")
+                    print("  GET <filename>  - Download file from server to client_data/")
+                    print("  PUT <filename>  - Upload file from client_data/ to server")
                     print("  EXIT            - Disconnect and quit")
+                    print(f"\nLocal directory: {self.client_data_dir.absolute()}")
                 else:
                     print(f"[error] Unknown command: {command}")
                     print("Type HELP for available commands")

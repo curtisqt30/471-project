@@ -204,7 +204,7 @@ def setup_server_directory():
     # Create a sample file for testing
     sample_file = DATA_DIR / "TestFile.txt"
     if not sample_file.exists():
-        sample_file.write_text("Welcome to the FTP server!\nThis is a sample file.")
+        sample_file.write_text("This is a sample file.")
         print(f"[server] Created sample file: TestFile.txt")
 
 
