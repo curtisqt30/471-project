@@ -43,44 +43,152 @@ class FTPProtocol:
 # Handle individual client connections
 def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
     peer = f"{addr[0]}:{addr[1]}"
-    print(f"[+] connected: {peer}")
-
+    print(f"[+] Connected: {peer}")
+    
     protocol = FTPProtocol()
-
+    
     try:
         with conn:
-            # Welcome message
+            # Send welcome message
             welcome = protocol.create_response("OK", f"Welcome to FTP Server. Commands: LS, GET <file>, PUT <file>, EXIT")
             conn.sendall(welcome)
-
+            
             while not stop.is_set():
                 # Receive command (up to 4KB)
                 data = conn.recv(4096)
                 if not data:
                     break
                 
-                # Parse commands
+                # Parse command
                 cmd_data = protocol.parse_command(data)
                 command = cmd_data["command"]
                 argument = cmd_data["argument"]
-
+                
                 print(f"[{peer}] Command: {command} {argument}")
-
+                
                 # Process commands
                 if command == "EXIT":
                     response = protocol.create_response("OK", "Goodbye")
                     conn.sendall(response)
                     break
+                    
                 elif command == "LS":
-                    # TODO list files in server data directory
-                    pass
+                    # List files in server data directory
+                    try:
+                        if DATA_DIR.exists():
+                            files = [f.name for f in DATA_DIR.iterdir() if f.is_file()]
+                            response = protocol.create_response(
+                                "OK", 
+                                f"Files: {len(files)}", 
+                                {"files": files}
+                            )
+                        else:
+                            response = protocol.create_response("OK", "No files", {"files": []})
+                    except Exception as e:
+                        response = protocol.create_response("ERROR", f"Failed to list files: {e}")
+                    conn.sendall(response)
+                    
                 elif command == "GET":
-                    # TODO send file to client
-                    pass
+                    # Send file to client (placeholder)
+                    if not argument:
+                        response = protocol.create_response("ERROR", "GET requires filename")
+                    else:
+                        file_path = DATA_DIR / argument
+                        if file_path.exists() and file_path.is_file():
+                            try:
+                                # First send metadata
+                                file_size = file_path.stat().st_size
+                                metadata = protocol.create_response(
+                                    "OK", 
+                                    f"Sending {argument}",
+                                    {"filename": argument, "size": file_size}
+                                )
+                                conn.sendall(metadata)
+                                
+                                # Then send file content (in next iteration, we'll implement actual transfer)
+                                with open(file_path, 'rb') as f:
+                                    file_content = f.read()
+                                    # For now, if it's a text file and small, send as JSON
+                                    if file_size < 1024:  # Less than 1KB
+                                        try:
+                                            text_content = file_content.decode('utf-8')
+                                            response = protocol.create_response(
+                                                "FILE_DATA",
+                                                "",
+                                                {"content": text_content}
+                                            )
+                                            conn.sendall(response)
+                                        except:
+                                            response = protocol.create_response(
+                                                "ERROR",
+                                                "Binary file transfer not yet implemented"
+                                            )
+                                            conn.sendall(response)
+                                    else:
+                                        response = protocol.create_response(
+                                            "ERROR",
+                                            "Large file transfer not yet implemented"
+                                        )
+                                        conn.sendall(response)
+                            except Exception as e:
+                                response = protocol.create_response("ERROR", f"Failed to read file: {e}")
+                                conn.sendall(response)
+                        else:
+                            response = protocol.create_response("ERROR", f"File not found: {argument}")
+                            conn.sendall(response)
+                    
                 elif command == "PUT":
-                    # TODO receive file from client
-                    pass 
-                
+                    # Receive file from client (placeholder)
+                    if not argument:
+                        response = protocol.create_response("ERROR", "PUT requires filename")
+                        conn.sendall(response)
+                    else:
+                        # Send ready signal
+                        response = protocol.create_response(
+                            "READY", 
+                            f"Ready to receive {argument}"
+                        )
+                        conn.sendall(response)
+                        
+                        # Wait for file data (simplified version)
+                        file_data = conn.recv(8192)  # Receive up to 8KB
+                        if file_data:
+                            try:
+                                # Try to parse as JSON first (for text files)
+                                json_data = json.loads(file_data.decode('utf-8'))
+                                if "content" in json_data:
+                                    file_path = DATA_DIR / argument
+                                    file_path.write_text(json_data["content"])
+                                    response = protocol.create_response(
+                                        "OK",
+                                        f"File {argument} saved successfully"
+                                    )
+                                else:
+                                    response = protocol.create_response(
+                                        "ERROR",
+                                        "Invalid file data format"
+                                    )
+                            except json.JSONDecodeError:
+                                # Handle as binary data
+                                file_path = DATA_DIR / argument
+                                file_path.write_bytes(file_data)
+                                response = protocol.create_response(
+                                    "OK",
+                                    f"File {argument} saved successfully"
+                                )
+                            except Exception as e:
+                                response = protocol.create_response("ERROR", f"Failed to save file: {e}")
+                        else:
+                            response = protocol.create_response("ERROR", "No file data received")
+                        conn.sendall(response)
+                    
+                else:
+                    response = protocol.create_response(
+                        "ERROR", 
+                        f"Unknown command: {command}. Use LS, GET, PUT, or EXIT"
+                    )
+                    conn.sendall(response)
+                    
     except ConnectionResetError:
         print(f"[!] Connection reset by {peer}")
     except Exception as e:
@@ -92,6 +200,13 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
 def setup_server_directory():
     DATA_DIR.mkdir(exist_ok=True)
     print(f"[server] Data directory: {DATA_DIR.absolute()}")
+
+    # Create a sample file for testing
+    sample_file = DATA_DIR / "TestFile.txt"
+    if not sample_file.exists():
+        sample_file.write_text("Welcome to the FTP server!\nThis is a sample file.")
+        print(f"[server] Created sample file: TestFile.txt")
+
 
 # Setup signal handlers for graceful shutdonw
 def setup_signals() -> None:
