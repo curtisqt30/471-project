@@ -7,13 +7,17 @@ import threading
 import json
 from typing import Tuple, List
 from pathlib import Path
+from server.handlers import LoggingHandler
 
-# Global stop event for graceuful shutdown
+# Global stop event for graceful shutdown
 stop = threading.Event()
 workers: List[threading.Thread] = []
 
 # Server data directory for file storage
 DATA_DIR = Path("server_data")
+
+# Create Logger instance
+logger = LoggingHandler()
 
 # Simple FTP protocol handler with JSON
 class FTPProtocol:
@@ -44,6 +48,9 @@ class FTPProtocol:
 def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
     peer = f"{addr[0]}:{addr[1]}"
     print(f"[+] Connected: {peer}")
+
+    # Log connection
+    logger.log_connection(addr)
     
     protocol = FTPProtocol()
     
@@ -65,6 +72,9 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                 argument = cmd_data["argument"]
                 
                 print(f"[{peer}] Command: {command} {argument}")
+
+                # Log command
+                logger.log_command(addr, command, argument)
                 
                 # Process commands
                 if command == "EXIT":
@@ -85,13 +95,15 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                         else:
                             response = protocol.create_response("OK", "No files", {"files": []})
                     except Exception as e:
+                        logger.log_error(addr, f"LS failed: {e}")
                         response = protocol.create_response("ERROR", f"Failed to list files: {e}")
                     conn.sendall(response)
                     
                 elif command == "GET":
-                    # Send file to client (placeholder)
+                    # Send file to client
                     if not argument:
                         response = protocol.create_response("ERROR", "GET requires filename")
+                        conn.sendall(response)
                     else:
                         file_path = DATA_DIR / argument
                         if file_path.exists() and file_path.is_file():
@@ -105,7 +117,7 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                                 )
                                 conn.sendall(metadata)
                                 
-                                # Then send file content (in next iteration, we'll implement actual transfer)
+                                # Then send file content
                                 with open(file_path, 'rb') as f:
                                     file_content = f.read()
                                     # For now, if it's a text file and small, send as JSON
@@ -118,27 +130,36 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                                                 {"content": text_content}
                                             )
                                             conn.sendall(response)
-                                        except:
+                                            
+                                            # Log successful download
+                                            logger.log_download(addr, argument, file_size)
+                                        except UnicodeDecodeError:
                                             response = protocol.create_response(
                                                 "ERROR",
                                                 "Binary file transfer not yet implemented"
                                             )
                                             conn.sendall(response)
+                                            logger.log_error(addr, f"Binary file not supported: {argument}")
                                     else:
                                         response = protocol.create_response(
                                             "ERROR",
                                             "Large file transfer not yet implemented"
                                         )
                                         conn.sendall(response)
+                                        logger.log_error(addr, f"File too large: {argument} ({file_size} bytes)")
                             except Exception as e:
+                                # Log error
+                                logger.log_error(addr, f"GET failed: {e}")
                                 response = protocol.create_response("ERROR", f"Failed to read file: {e}")
                                 conn.sendall(response)
                         else:
-                            response = protocol.create_response("ERROR", f"File not found: {argument}")
+                            error_msg = f"File not found: {argument}"
+                            logger.log_error(addr, error_msg)
+                            response = protocol.create_response("ERROR", error_msg)
                             conn.sendall(response)
                     
                 elif command == "PUT":
-                    # Receive file from client (placeholder)
+                    # Receive file from client
                     if not argument:
                         response = protocol.create_response("ERROR", "PUT requires filename")
                         conn.sendall(response)
@@ -159,6 +180,11 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                                 if "content" in json_data:
                                     file_path = DATA_DIR / argument
                                     file_path.write_text(json_data["content"])
+                                    file_size = len(json_data["content"])
+                                    
+                                    # Log successful upload
+                                    logger.log_upload(addr, argument, file_size)
+                                    
                                     response = protocol.create_response(
                                         "OK",
                                         f"File {argument} saved successfully"
@@ -168,33 +194,48 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                                         "ERROR",
                                         "Invalid file data format"
                                     )
+                                    logger.log_error(addr, f"Invalid PUT data format: {argument}")
                             except json.JSONDecodeError:
                                 # Handle as binary data
                                 file_path = DATA_DIR / argument
                                 file_path.write_bytes(file_data)
+                                file_size = len(file_data)
+                                
+                                # Log successful upload
+                                logger.log_upload(addr, argument, file_size)
+                                
                                 response = protocol.create_response(
                                     "OK",
                                     f"File {argument} saved successfully"
                                 )
                             except Exception as e:
+                                logger.log_error(addr, f"PUT failed: {e}")
                                 response = protocol.create_response("ERROR", f"Failed to save file: {e}")
                         else:
-                            response = protocol.create_response("ERROR", "No file data received")
+                            error_msg = "No file data received"
+                            logger.log_error(addr, error_msg)
+                            response = protocol.create_response("ERROR", error_msg)
                         conn.sendall(response)
                     
                 else:
+                    error_msg = f"Unknown command: {command}"
+                    logger.log_error(addr, error_msg)
                     response = protocol.create_response(
                         "ERROR", 
-                        f"Unknown command: {command}. Use LS, GET, PUT, or EXIT"
+                        f"{error_msg}. Use LS, GET, PUT, or EXIT"
                     )
                     conn.sendall(response)
                     
     except ConnectionResetError:
         print(f"[!] Connection reset by {peer}")
+        logger.log_error(addr, "Connection reset")
     except Exception as e:
         print(f"[!] Error with {peer}: {e}")
+        logger.log_error(addr, f"Unexpected error: {e}")
     finally:
         print(f"[-] Disconnected: {peer}")
+        # Log disconnection
+        logger.log_disconnect(addr)
 
 # Create server data directory if it doesn't exist
 def setup_server_directory():
@@ -208,10 +249,11 @@ def setup_server_directory():
         print(f"[server] Created sample file: TestFile.txt")
 
 
-# Setup signal handlers for graceful shutdonw
+# Setup signal handlers for graceful shutdown
 def setup_signals() -> None:
     def signal_handler(signum, frame):
         print(f"\n[server] Received signal {signum}; shutting down...")
+        logger.log_server_event("Shutdown signal received")
         stop.set()
     
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -230,6 +272,9 @@ def main() -> None:
     setup_signals()
     setup_server_directory()
 
+    # Log server startup
+    logger.log_server_event(f"Server starting on {args.host}:{args.port}")
+
     # Create server socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -240,6 +285,9 @@ def main() -> None:
         print(f"[server] FTP Server listening on {args.host}:{args.port}")
         print(f"[server] Commands: LS, GET <file>, PUT <file>, EXIT")
         print(f"[server] Press Ctrl+C to stop")
+        
+        # Log server ready
+        logger.log_server_event(f"Server listening on {args.host}:{args.port}")
         
         try:
             while not stop.is_set():
@@ -260,6 +308,8 @@ def main() -> None:
         finally:
             # Cleanup
             print("[server] Shutting down...")
+            logger.log_server_event("Server shutting down")
+            
             try:
                 server_socket.shutdown(socket.SHUT_RDWR)
             except Exception:
@@ -270,6 +320,7 @@ def main() -> None:
                 thread.join(timeout=1.0)
             
             print("[server] Server stopped")
+            logger.log_server_event("Server stopped")
 
 if __name__ == "__main__":
     main()

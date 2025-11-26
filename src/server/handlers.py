@@ -118,5 +118,53 @@ class ErrorHandler:
 
 # Handler for logging management
 class LoggingHandler:
-    """Handle server activity logging"""
-    pass
+    """Handle server activity logging to file"""
+    
+    def __init__(self, log_file: str = "server_data/ftp_server.log"):
+        from datetime import datetime
+        self.log_file = Path(log_file)
+        # Ensure parent directory exists
+        self.log_file.parent.mkdir(exist_ok=True)
+        # Write startup message
+        self._write_log("SERVER", "FTP Server started")
+    
+    def _write_log(self, event_type: str, message: str):
+        """Write a log entry with timestamp"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"{timestamp} | {event_type:12} | {message}\n"
+        
+        try:
+            with open(self.log_file, 'a') as f:
+                f.write(log_entry)
+        except Exception as e:
+            print(f"[WARNING] Failed to write log: {e}")
+    
+    def log_connection(self, client_addr: Tuple[str, int]):
+        """Log client connection"""
+        self._write_log("CONNECT", f"{client_addr[0]}:{client_addr[1]} connected")
+    
+    def log_disconnect(self, client_addr: Tuple[str, int]):
+        """Log client disconnection"""
+        self._write_log("DISCONNECT", f"{client_addr[0]}:{client_addr[1]} disconnected")
+    
+    def log_command(self, client_addr: Tuple[str, int], command: str, argument: str = ""):
+        """Log command execution"""
+        cmd_str = f"{command} {argument}".strip()
+        self._write_log("COMMAND", f"{client_addr[0]}:{client_addr[1]} | {cmd_str}")
+    
+    def log_upload(self, client_addr: Tuple[str, int], filename: str, size: int):
+        """Log file upload"""
+        self._write_log("UPLOAD", f"{client_addr[0]}:{client_addr[1]} | {filename} ({size} bytes)")
+    
+    def log_download(self, client_addr: Tuple[str, int], filename: str, size: int):
+        """Log file download"""
+        self._write_log("DOWNLOAD", f"{client_addr[0]}:{client_addr[1]} | {filename} ({size} bytes)")
+    
+    def log_error(self, client_addr: Tuple[str, int], error_msg: str):
+        """Log error"""
+        self._write_log("ERROR", f"{client_addr[0]}:{client_addr[1]} | {error_msg}")
+    
+    def log_server_event(self, message: str):
+        """Log general server event"""
+        self._write_log("SERVER", message)
