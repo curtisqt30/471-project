@@ -73,55 +73,11 @@ class FileTransferHandler:
         except Exception as e:
             return False, f"Failed to save file: {e}"
 
-# Handler for FTP protocol operations
-class BinaryTransferHandler:
-    
-    CHUNK_SIZE = 4096
-    
-    @staticmethod
-    def send_file_chunked(sock: socket.socket, file_path: Path) -> bool:
-        """Send file in chunks (not yet implemented)"""
-        # TODO: Implement chunked transfer for large files
-        # implemented in Part 2
-        pass
-    
-    @staticmethod
-    def receive_file_chunked(sock: socket.socket, file_path: Path, file_size: int) -> bool:
-        """Receive file in chunks (not yet implemented)"""
-        # TODO: Implement chunked receive for large files
-        #  implemented in Part 2
-        pass
-
-# Handler for authentication and user management
-class AuthenticationHandler:
-    
-    # Initialize with user store
-    def __init__(self):
-        # Simple in-memory user store for demonstration
-        self.users = {
-            "admin": "password123",
-            "user1": "pass1",
-            "guest": "guest"
-        }
-    
-    # Authenticate user
-    def authenticate(self, username: str, password: str) -> bool:
-        """Authenticate user (not yet integrated)"""
-        return self.users.get(username) == password
-    
-    # Add new user
-    def add_user(self, username: str, password: str) -> bool:
-        """Add new user (not yet integrated)"""
-        if username in self.users:
-            return False
-        self.users[username] = password
-        return True
-
 # Handler for command parsing and validation
 class CommandParser:
     
     # List of valid commands
-    VALID_COMMANDS = ["LS", "GET", "PUT", "EXIT", "HELP", "CD", "PWD", "MKDIR", "DELETE"]
+    VALID_COMMANDS = ["LS", "GET", "PUT", "EXIT", "HELP"]
     
     @classmethod
     def parse(cls, command_str: str) -> Tuple[str, str]:
@@ -140,7 +96,7 @@ class CommandParser:
     @classmethod
     def requires_argument(cls, command: str) -> bool:
         """Check if command requires an argument"""
-        return command in ["GET", "PUT", "CD", "MKDIR", "DELETE"]
+        return command in ["GET", "PUT"]
 
 # Handler for error management
 class ErrorHandler:
@@ -160,17 +116,7 @@ class ErrorHandler:
         print(f"[ERROR] Client {client_addr[0]}:{client_addr[1]} - {error}")
 
 
-# TODO: these handlers rqeuired for Part 2
-class DirectoryHandler:
-    """Handle directory operations (CD, PWD, MKDIR)"""
-    pass
-
-
-class SecurityHandler:
-    """Handle encryption and secure transfers"""
-    pass
-
-
+# Handler for logging management
 class LoggingHandler:
     """Handle server activity logging"""
     pass
