@@ -4,8 +4,8 @@
 ### Authors
 ```
 Curtis Quan-Tran     C
-Uzair Salema         U
-Sinan Abdul-Hafiz    Sinan@csuf.edu
+Uzair Salema         salema.uzair@csu.fullerton.edu
+Sinan Abdul-Hafiz    sinan@csuf.edu
 Jay Parmar           J
 Elizsa Montoya       E
 ```
