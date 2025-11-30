@@ -2,11 +2,11 @@
 ## CPSC 471 - Network Programming Project
 
 ### Authors
-Curtis Quan-Tran
-Uzair Salema
-Sinan Abdul-Hafiz
-Jay Parmar
-Elizsa Montoya
+- Curtis Quan-Tran
+- Uzair Salema
+- Sinan Abdul-Hafiz
+- Jay Parmar
+- Elizsa Montoya
 
 ## Project Overview
 - A multi-client FTP server and client implemention in Python that supports basic file transfer operations
