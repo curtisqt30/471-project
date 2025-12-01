@@ -3,11 +3,11 @@
 
 ### Authors
 ```
-Curtis Quan-Tran     C
+Curtis Quan-Tran     cquantran@csu.fullerton.edu
 Uzair Salema         salema.uzair@csu.fullerton.edu
 Sinan Abdul-Hafiz    sinan@csuf.edu
-Jay Parmar           J
-Elizsa Montoya       E
+Jay Parmar           jay-04.CS@csu.fullerton.edu
+Elizsa Montoya       lizsamon@csu.fullerton.edu
 ```
 
 ## Project Overview
