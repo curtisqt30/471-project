@@ -65,7 +65,7 @@ python -m server.main --host 0.0.0.0 --port 5050
 ### 3) Start the client (in another terminal)
 ```bash
 cd src
-python -m client.main 127.0.0.1 5050`
+python -m client.main 127.0.0.1 5050
 ```
 
 ## User Guide: File Storage
