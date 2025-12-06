@@ -11,11 +11,11 @@ Elizsa Montoya       lizsamon@csu.fullerton.edu
 ```
 
 ## Project Overview
-- A multi-client FTP server and client implemention in Python that supports basic file transfer operations
+- A multi-client FTP server and client implementation in Python that supports basic file transfer operations
 
 ### Requirements:
 - Python 3.7 or higher
-- No external dependences (uses standard library only)
+- No external dependencies (uses standard library only)
 
 ### Server:
 - Stores files in a server data directory
